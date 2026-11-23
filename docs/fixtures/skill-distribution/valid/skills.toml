@@ -1,9 +1,10 @@
-# Minimal valid selection manifest. Resolves to three canonical skills.
+# Minimal valid selection manifest. Pins the commit that introduced
+# catalogue.toml and resolves to three canonical skills.
 schema = 1
 
 [source]
 repository = "kostahuffman/agent-skills"
-ref = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
+ref = "775a34162226fa4cb08ae981dd9da8b0b3f71806"
 path = "skills"
 catalogue_path = "catalogue.toml"
 

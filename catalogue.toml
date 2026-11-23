@@ -11,6 +11,16 @@ schema = 1
 [upstream]
 repository = "addyosmani/agent-skills"
 
+[[shared]]
+id = "agents"
+path = "agents"
+ownership = "upstream"
+
+[[shared]]
+id = "references"
+path = "references"
+ownership = "upstream"
+
 [[skill]]
 id = "accessibility-engineering"
 ownership = "upstream"

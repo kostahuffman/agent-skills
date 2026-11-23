@@ -2,14 +2,14 @@
 schema = 1
 
 [manifest]
-sha256 = "sha256:95d5443302d17ec518686c336311cdd9697c4ec49e61b37787b88fc4b9ea18fa"
+sha256 = "sha256:46935bd7943344a11653c77eec6b87e97e0ef0a0ca6b6b05ade330307650ae91"
 
 [[source]]
 id = "canonical"
 kind = "git"
 repository = "kostahuffman/agent-skills"
-requested_ref = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
-commit = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
+requested_ref = "775a34162226fa4cb08ae981dd9da8b0b3f71806"
+commit = "775a34162226fa4cb08ae981dd9da8b0b3f71806"
 path = "skills"
 catalogue_path = "catalogue.toml"
 
@@ -20,6 +20,17 @@ skills = [
   "git-workflow-and-versioning",
   "using-agent-skills",
 ]
+
+[[shared]]
+id = "references"
+source = "canonical"
+path = "references"
+files = [
+  "definition-of-done.md",
+  "performance-checklist.md",
+  "security-checklist.md",
+]
+hash = "sha256:57e3489661f4a304e05f8b342a197349c227ced2eabe52f221f4d02ac735da5a"
 
 [[skill]]
 id = "code-review-and-quality"

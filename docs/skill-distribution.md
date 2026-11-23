@@ -43,10 +43,12 @@ Non-goals for schema `1`:
 | `skills.toml` (consumer root) | Yes | Consuming repository | Canonical source, profile, and include/exclude selection. |
 | `skills.lock.toml` (consumer root) | Yes | Consuming repository | Immutable resolved commit, selected sources, paths, and content hashes. |
 | `skills.sources.toml` (consumer root) | Yes | Consuming repository | External Git skill declarations. The legacy `skills/sources.toml` path is inside an ignored root and must migrate. |
+| `references/` and `agents/` (source root) | Yes | `kostahuffman/agent-skills` | Shared resources referenced by selected skills. The catalogue declares which roots are installable. |
 | `skills/<id>/` | No, generated | Installer | Canonical selected skill content. |
+| `references/` and `agents/` (consumer root) | No, generated | Installer | Required shared resources, installed at the same repository-relative paths. |
 | `.agents/skills/<id>/` | No, generated | Installer | Codex discovery adapter. |
 | `.claude/skills/<id>/` | No, generated | Installer | Claude Code discovery adapter. |
-| `.skills-managed` (inside each generated skill directory) | No, generated | Installer | Ownership marker; never copied from a source. |
+| `.skills-managed` (inside each generated skill or shared resource root) | No, generated | Installer | Ownership marker; never copied from a source. |
 
 The canonical skill source is the `skills/` directory of a release commit of
 `kostahuffman/agent-skills`. `catalogue.toml` is the machine-readable index of
@@ -102,6 +104,16 @@ schema = 1
 [upstream]
 repository = "addyosmani/agent-skills"
 
+[[shared]]
+id = "agents"
+path = "agents"
+ownership = "upstream"
+
+[[shared]]
+id = "references"
+path = "references"
+ownership = "upstream"
+
 [[skill]]
 id = "code-review-and-quality"
 ownership = "upstream"
@@ -123,6 +135,12 @@ Field reference:
 | `[[skill]].upstream_path` | No | Upstream-relative path for provenance. Defaults to `skills/<id>` for upstream skills. |
 | `[[skill]].diverged_from` | No | Upstream commit, tag, or SHA the custom divergence is based on. |
 | `[[skill]].note` | No | Short human-readable provenance note. Never used for selection. |
+| `[[shared]].id` | Yes | Stable identifier for a shared resource root. Uses the skill identifier grammar. |
+| `[[shared]].path` | Yes | Repository-relative shared root. MUST NOT be `skills/`, overlap another shared path, or contain a selected skill. |
+| `[[shared]].ownership` | Yes | `upstream` or `custom`; the same provenance rules as skills. |
+| `[[shared]].upstream_path` | No | Upstream-relative path for provenance. Defaults to `path`. |
+| `[[shared]].diverged_from` | No | Upstream commit, tag, or SHA the custom divergence is based on. |
+| `[[shared]].note` | No | Short human-readable provenance note. Never used for selection. |
 
 Catalogue validation MUST enforce:
 
@@ -134,7 +152,34 @@ Catalogue validation MUST enforce:
   Windows filename.
 - `upstream` entries do not carry `diverged_from`.
 - `diverged_from` is absent or a valid commit/tag reference.
+- Every `[[shared]]` path exists and is a directory at the release commit.
+- `[[shared]]` identifiers and paths are unique, case-insensitively.
+- `[[shared]]` paths do not overlap each other and do not sit under `skills/`.
 - Unknown keys are rejected.
+
+### 3.4 Shared resources
+
+Some selected skills link outside their own directory to shared checklists or
+personas (`../../references/...`, `../../agents/...`). Those links are part of
+the skill content and MUST continue to resolve after installation. The
+catalogue declares the source roots that may contain shared resources; the
+installer discovers the required files from the selected skills rather than
+installing every shared file.
+
+Rules:
+
+- Only roots declared by `[[shared]]` are installable shared resources.
+- A relative link from a selected canonical skill MUST resolve to a regular
+  file under a declared shared root at the pinned commit. A link that escapes
+  the repository, points at another skill, or points outside every declared
+  shared root fails with `shared.outside_root`.
+- A link to a missing file fails with `shared.missing`.
+- The lock records the exact required file set and its hash. A shared root with
+  no required files is not installed.
+- Shared resources are derived, not selected directly by consumers. They are
+  not listed in `selection.skills`.
+- External and package skills are installed as declared and MUST be
+  self-contained. Their links are not resolved against canonical shared roots.
 
 ## 4. Consumer selection manifest (`skills.toml`)
 
@@ -193,21 +238,34 @@ Selection is evaluated in this order:
      include fails with `selection.unknown_skill`.
    - Add every identifier in `selection.include` that exists in the canonical
      catalogue. An include that names only an external or package skill is
-     validated in step 4 and is already covered by automatic source inclusion.
+     validated in step 5 and is already covered by automatic source inclusion.
    - Remove every identifier in the profile's `exclude` and
      `selection.exclude` from the canonical set.
-2. Add external Git skills declared in `skills.sources.toml` (Section 5.2)
+2. Resolve required shared resources for the canonical set.
+   - Scan every Markdown file in each selected canonical skill tree for
+     relative links to files outside the skill directory. Ignore absolute URLs
+     and fenced code blocks.
+   - Resolve each link against the pinned commit. It MUST land on a regular
+     file under a catalogue-declared `[[shared]]` root. A link outside every
+     declared root fails with `shared.outside_root`; a missing file fails with
+     `shared.missing`.
+   - Collect the required files per shared root, deduplicated and sorted. A
+     shared root with no required files is not installed.
+   - Shared resources are derived from the selected skills. They are recorded
+     under `[[shared]]` in the lock, not in `selection.skills`.
+3. Add external Git skills declared in `skills.sources.toml` (Section 5.2)
    unless their identifier is excluded.
-3. Add skills advertised by installed-package providers (Section 5.3) unless
+4. Add skills advertised by installed-package providers (Section 5.3) unless
    their identifier is excluded.
-4. Validate the shared namespace:
+5. Validate the shared namespace:
    - Every explicitly included or excluded identifier MUST exist in the union
      of all sources before exclusions, or validation fails.
    - Every installed identifier MUST have exactly one owner, or validation
      fails.
-5. The final set MUST be non-empty. An empty canonical selection is allowed
+6. The final set MUST be non-empty. An empty canonical selection is allowed
    only when at least one external or package skill is installed.
-6. Sort identifiers byte-wise and write them to the lock.
+7. Sort identifiers byte-wise, write them to the lock, and write the required
+   shared resources under their catalogue-declared paths.
 
 Exclusion always wins over inclusion. There is no implicit default set and no
 "install everything" mode. A profile is a named shortcut, not a permission
@@ -257,7 +315,7 @@ consumer needs it.
 
 The example below is illustrative; its digests are placeholders. See
 [`fixtures/skill-distribution/valid/skills.lock.toml`](fixtures/skill-distribution/valid/skills.lock.toml)
-for a minimal fixture whose hashes match the current repository content.
+for a minimal fixture whose hashes match the pinned repository commit.
 
 ```toml
 schema = 1
@@ -303,6 +361,13 @@ skills = [
   "test-driven-development",
   "using-agent-skills",
 ]
+
+[[shared]]
+id = "references"
+source = "canonical"
+path = "references"
+files = ["definition-of-done.md", "security-checklist.md"]
+hash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 [[skill]]
 id = "deprecation-and-migration"
@@ -374,7 +439,7 @@ Top-level:
 | Field | Required | Meaning |
 |---|---|---|
 | `profile` | No | Profile name used to resolve the canonical set. Omit when no profile was used. |
-| `skills` | Yes | Sorted, unique identifiers of every installed skill across all sources. |
+| `skills` | Yes | Sorted, unique identifiers of every installed skill across all sources. Shared resources are not listed here. |
 
 `[[skill]]`:
 
@@ -384,6 +449,16 @@ Top-level:
 | `source` | Yes | Matching `[[source]].id`. |
 | `path` | Yes | Source-relative POSIX path to the skill directory or content root. |
 | `hash` | Yes | `sha256:<64 lowercase hex>` content hash (Section 5.3). |
+
+`[[shared]]`:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `id` | Yes | Matching catalogue `[[shared]].id`. |
+| `source` | Yes | `canonical`. |
+| `path` | Yes | Consumer-relative POSIX path of the installed shared root. |
+| `files` | Yes | Sorted, unique required files relative to `path`. |
+| `hash` | Yes | Content hash of exactly `files` (Section 5.3). |
 
 The lock MUST NOT contain timestamps, hostnames, usernames, absolute paths, or
 other machine-specific values. `skills-update` produces the same lock bytes for
@@ -417,21 +492,25 @@ invalid.
 The digest of `skills.toml` and `skills.sources.toml` uses the same
 line-ending normalization, but the entire file is the content set.
 
+A `[[shared]]` hash uses the same algorithm over exactly its `files` list, with
+paths relative to the shared root's `path`. The `.skills-managed` marker is
+installer metadata and is excluded.
+
 ### 5.4 Lifecycle
 
 - `skills-install` reads `skills.toml` and `skills.lock.toml`, verifies the
   manifest hash, source declarations, selection, and commit, fetches exactly
-  the locked commit, and writes only the selected skills. It NEVER resolves a
-  tag or branch.
+  the locked commit, and writes only the selected skills and required shared
+  resources. It NEVER resolves a tag or branch.
 - `skills-check` is read-only and works offline. It verifies the lock against
-  the manifest and sources, every installed file against its hash, all
-  generated adapters, package provider versions, and the absence of stale
-  managed directories. It never contacts the network.
+  the manifest and sources, every installed skill file and shared resource
+  against its hash, all generated adapters, package provider versions, and the
+  absence of stale managed directories. It never contacts the network.
 - `skills-update` is the only operation that resolves refs and mutates tracked
   metadata. It requires network access, resolves tags to commits, recomputes
-  selection and hashes, writes the lock, and is expected to produce a
-  reviewable PR containing only manifest/lock/sources changes. It MUST NOT
-  commit installed skill content.
+  selection, required shared resources, and hashes, writes the lock, and is
+  expected to produce a reviewable PR containing only manifest/lock/sources
+  changes. It MUST NOT commit installed skill or shared resource content.
 - `skills-sync` MAY remain as an alias for `skills-install` for existing
   templates, but the canonical command names are `skills-install`,
   `skills-check`, and `skills-update`.
@@ -446,6 +525,8 @@ fail rather than repair the lock implicitly:
 - The manifest profile or include/exclude set resolves to a different selection.
 - A selected skill is missing from the locked commit.
 - A selected skill's content hash differs from the lock.
+- A selected skill's required shared file set differs from the lock.
+- A required shared resource is missing, or its content hash differs.
 - A resolve commit is not a full SHA.
 - Two installed sources own the same identifier.
 - A package skill's distribution, version, provider, or content hash differs.
@@ -459,6 +540,9 @@ fail rather than repair the lock implicitly:
 | Canonical | `skills.toml` | Profile/include/exclude | `canonical` |
 | External Git | `skills.sources.toml` | Automatic, opt-out via exclude | `external:<skill-id>` |
 | Installed package | Provider entry point in the Pixi environment | Automatic, opt-out via exclude | `package:<distribution>` |
+
+Canonical shared resources are part of the canonical source; they are not a
+fourth source class and are not listed in `selection.skills`.
 
 All three classes share one global identifier namespace. There is no
 precedence order: an identifier MUST have exactly one owner among the installed
@@ -546,7 +630,13 @@ The installer owns these roots:
 skills/
 .agents/skills/
 .claude/skills/
+references/
+agents/
 ```
+
+`references/` and `agents/` are examples of catalogue-declared shared roots.
+The installer owns only the shared roots that appear in the lock; a shared root
+with no required files is not created.
 
 Required consumer `.gitignore` entries:
 
@@ -554,29 +644,39 @@ Required consumer `.gitignore` entries:
 /skills/
 /.agents/skills/
 /.claude/skills/
+/references/
+/agents/
 ```
+
+Add only the shared-root entries that appear in `[[shared]]` in the lock.
 
 Rules:
 
 - `skills/<id>/` holds the canonical selected content, including
-  `references/` and `scripts/`.
+  `references/` and `scripts/` inside the skill directory.
+- `references/<path>` and `agents/<path>` hold the required shared files at
+  the same repository-relative paths, preserving the links in the selected
+  skills. They are generated content, not a full copy of the source roots.
 - `.agents/skills/<id>/SKILL.md` and `.claude/skills/<id>/SKILL.md` are thin,
   deterministic discovery adapters. They carry the skill frontmatter and point
   at `../../../skills/<id>/SKILL.md`; they do not duplicate full skill bodies.
-- Every generated skill directory contains a `.skills-managed` marker. The
-  installer MUST only replace or remove a directory that contains this marker.
-  If a selected identifier already exists without the marker, install fails
-  with an ownership conflict and instructs the user to move it. This preserves
-  unrelated skills that a developer may keep in `.claude/skills/` or
-  `.agents/skills/`.
+- Every generated skill directory and shared root contains a `.skills-managed`
+  marker. The installer MUST only replace or remove a directory that contains
+  this marker. If a selected identifier or shared root already exists without
+  the marker, install fails with `install.owned_conflict` and instructs the
+  user to move it. This preserves unrelated skills that a developer may keep
+  in `.claude/skills/`, `.agents/skills/`, `references/`, or `agents/`.
 - The installer MUST NOT modify tracked files. `AGENTS.md`, `CLAUDE.md`, and
   other project configuration remain project-owned. After `skills-install`,
   `git status` MUST be clean because all generated content is ignored.
-- Existing consumers with tracked skill content MUST untrack it in a dedicated
-  migration PR. Adding ignore rules does not remove files already in the Git
-  index. A tracked `skills/sources.toml` MUST move to `skills.sources.toml` in
-  the same PR.
-- Project-owned skill guidance belongs outside the three managed roots.
+- Existing consumers with tracked skill content or tracked files under a
+  shared root MUST untrack them in a dedicated migration PR, or avoid selecting
+  skills that require the shared root. Adding ignore rules does not remove
+  files already in the Git index. A tracked `skills/sources.toml` MUST move to
+  `skills.sources.toml` in the same PR.
+- Project-owned skill guidance, references, and personas belong outside the
+  managed roots. If a project already uses `references/` or `agents/`, move
+  that content or choose a shared root that does not collide.
 
 ## 8. Trusted-source and path safety
 
@@ -584,14 +684,17 @@ Installation is a supply-chain operation. Implementations MUST:
 
 - Fetch only from the declared repository and only at the locked full commit
   SHA. Fetching a tag, branch, or short SHA is not an install operation.
-- Verify every fetched skill's content hash before writing.
+- Verify every fetched skill's and shared resource's content hash before
+  writing.
 - Reject absolute paths, `..` segments, backslashes, drive letters, NUL bytes,
   empty segments, trailing dots/spaces, Windows reserved names (`CON`, `PRN`,
   `AUX`, `NUL`, `COM1`-`COM9`, `LPT1`-`LPT9`), and case-insensitive collisions.
-- Reject symlinks and non-regular files in selected skill trees.
+- Reject symlinks and non-regular files in selected skill trees and shared
+  resource roots.
 - Never execute fetched skill scripts, hooks, or package installation scripts
   during discovery, install, or check. Skill scripts are copied as content.
-- Never write outside the three managed roots.
+- Never write outside the generated skill roots and the catalogue-declared
+  shared roots.
 - Not forward credentials or embed tokens in URLs. Canonical sources use
   `owner/name`; external sources use credential-free HTTPS URLs.
 - Prefer a cache keyed by commit SHA plus content hash. A cache hit MUST be
@@ -613,6 +716,10 @@ schema version bump.
 | Repository | `owner/name`, no URL or credentials | `config.invalid_repository` |
 | Ref | Release tag or full 40-hex SHA | `config.invalid_ref` |
 | Paths | Safe relative POSIX path, inside the allowed root | `config.unsafe_path` |
+| Shared root | Shared path overlaps `skills/`, another shared path, or contains traversal | `config.unsafe_path` |
+| Shared root | Shared id/path duplicates another entry | `config.duplicate_id` |
+| Shared link | Selected skill link escapes declared shared roots | `shared.outside_root` |
+| Shared link | Required shared file is missing at the pinned commit | `shared.missing` |
 | Legacy path | Tracked `skills/sources.toml` not yet migrated | `config.legacy_sources_path` |
 | Selection | Final set non-empty | `selection.empty` |
 | Selection | Include/exclude identifiers exist | `selection.unknown_skill` |
@@ -624,6 +731,7 @@ schema version bump.
 | Lock | Selection matches resolved selection | `lock.selection_drift` |
 | Lock | Commit is a full 40-hex SHA | `lock.invalid_commit` |
 | Lock | Skill content hash matches | `lock.hash_mismatch` |
+| Lock | Shared file set or content hash matches | `lock.shared_drift` |
 | Lock | No stale managed directories | `lock.stale_install` |
 | Source | One owner per installed identifier | `source.duplicate_owner` |
 | Source | Repository is trusted | `source.untrusted` |
@@ -641,17 +749,28 @@ Fixtures live under [`fixtures/skill-distribution/`](fixtures/skill-distribution
 
 | Fixture | Expected result |
 |---|---|
-| [`valid/skills.toml`](fixtures/skill-distribution/valid/skills.toml) | Valid manifest; selects three canonical skills using a profile plus a top-level include. |
-| [`valid/skills.lock.toml`](fixtures/skill-distribution/valid/skills.lock.toml) | Valid lock matching the valid manifest and the current repository content hashes. |
+| [`valid/skills.toml`](fixtures/skill-distribution/valid/skills.toml) | Valid manifest; pins a commit containing `catalogue.toml` and selects three canonical skills using a profile plus a top-level include. |
+| [`valid/skills.lock.toml`](fixtures/skill-distribution/valid/skills.lock.toml) | Valid lock matching the valid manifest, the pinned commit content hashes, and the shared references required by the selected skills. |
 | [`invalid/missing-skill.toml`](fixtures/skill-distribution/invalid/missing-skill.toml) | `selection.unknown_skill`: the profile names a skill absent from the catalogue. |
 | [`invalid/duplicate-name-catalogue.toml`](fixtures/skill-distribution/invalid/duplicate-name-catalogue.toml) | `config.duplicate_id`: the same identifier appears twice. |
 | [`invalid/ref-drift.lock.toml`](fixtures/skill-distribution/invalid/ref-drift.lock.toml) | `lock.ref_drift` when paired with `valid/skills.toml`: the lock requests a different ref. |
 
-The valid lock's `manifest.sha256` and skill `hash` values are recomputed from
-the checked-in fixture and repository content at the time of this contract.
-Regenerate them if the selected skills change before this contract is accepted.
-Installer tests SHOULD copy the fixtures and assert the error class and exit
-status rather than the exact message text.
+The valid fixture pins `775a34162226fa4cb08ae981dd9da8b0b3f71806`, the commit
+that introduced `catalogue.toml`; the current release tag predates it. The
+resolver test reads `catalogue.toml`, the selected skills, and the shared
+resources from that pinned commit with `git cat-file` and `git show`, not from
+the PR checkout. Update the pin to the release commit before this contract is
+released, then regenerate the hashes.
+
+The valid lock's `manifest.sha256`, skill `hash` values, and `[[shared]]` hash
+are recomputed from the pinned commit. Regenerate them if the selected skills
+or required shared files change. Installer tests SHOULD copy the fixtures and
+assert the error class and exit status rather than the exact message text.
+
+The fixture resolver is `node scripts/validate-skill-distribution-fixtures.js`.
+It validates the catalogue, resolves the valid fixture against the pinned
+commit, checks the shared reference set and hashes, and confirms the intended
+error condition in each invalid fixture.
 
 ## 11. Compatibility and migration
 
@@ -662,13 +781,16 @@ status rather than the exact message text.
   `skills/` is now ignored. The lock is authoritative.
 - Existing consumers keep their tracked skills until a migration PR untracks
   them, including moving `skills/sources.toml`. The contract does not migrate
-  content.
+  content. Consumers with tracked files under a catalogue-declared shared root
+  must move or untrack them before installing a skill that requires that root.
 - Newly vended projects ship `skills.toml`, `skills.lock.toml`,
   `skills.sources.toml` when external sources are used, the installer entry
-  point, agent guidance, and the three ignore rules. They do not ship skill
+  point, agent guidance, and the ignore rules for the skill roots and the
+  shared roots in their lock. They do not ship skill or shared resource
   content.
 - `skills-update` PRs change tracked metadata, not installed files. If a PR
-  includes installed skill content, it violates this contract.
+  includes installed skill or shared resource content, it violates this
+  contract.
 
 ## 12. Review decisions to confirm
 
@@ -690,6 +812,9 @@ depends on them:
    future schema migration.
 8. The content hash matches the existing `digest()` algorithm, with a
    portable byte-order path sort.
+9. Shared resources are discovered from selected canonical skill links,
+   restricted to catalogue-declared roots, installed at the same
+   repository-relative paths, and hashed in the lock.
 
 ## 13. Verification
 
@@ -697,14 +822,22 @@ Before accepting this contract:
 
 - [ ] The catalogue lists every current skill exactly once and every
       `SKILL.md` frontmatter name matches.
+- [ ] Every catalogue-declared shared root exists at the release commit, and
+      shared identifiers and paths are unique and non-overlapping.
 - [ ] The valid manifest resolves to exactly the selected identifiers in the
       valid lock, with no duplicates.
 - [ ] The valid lock's manifest hash matches `valid/skills.toml`, and every
-      skill hash matches the current repository content.
+      skill hash matches the pinned commit content, not the PR checkout.
+- [ ] The pinned commit contains `catalogue.toml` and every selected skill and
+      required shared file.
+- [ ] The valid lock's `[[shared]]` entry matches the shared references
+      discovered from the selected skills, including the exact file set and
+      hash.
 - [ ] The missing-skill fixture fails with `selection.unknown_skill`, the
       duplicate-name fixture with `config.duplicate_id`, and the ref-drift
       fixture with `lock.ref_drift`.
 - [ ] All fixture TOML files parse.
+- [ ] `node scripts/validate-skill-distribution-fixtures.js` passes.
 - [ ] The contract is reviewed against Python, Dagster, and FastAPI needs:
       non-frontend skills are selectable without installing UI or browser
       skills, and API/security/observability skills are available.
