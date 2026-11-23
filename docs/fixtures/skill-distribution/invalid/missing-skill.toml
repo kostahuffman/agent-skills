@@ -1,0 +1,12 @@
+# Invalid: the profile selects an identifier that is not in the catalogue.
+schema = 1
+
+[source]
+repository = "kostahuffman/agent-skills"
+ref = "86e73f54d828da12ee337ffca28fcbf94355bc50"
+
+[selection]
+profile = "python-service"
+
+[profiles.python-service]
+include = ["using-agent-skills", "python-service-bootstrap"]

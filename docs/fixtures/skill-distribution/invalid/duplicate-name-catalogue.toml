@@ -1,0 +1,13 @@
+# Invalid: the same identifier appears twice. Expected error: config.duplicate_id.
+schema = 1
+
+[upstream]
+repository = "addyosmani/agent-skills"
+
+[[skill]]
+id = "using-agent-skills"
+ownership = "upstream"
+
+[[skill]]
+id = "using-agent-skills"
+ownership = "custom"

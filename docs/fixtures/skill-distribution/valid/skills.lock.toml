@@ -1,0 +1,51 @@
+# Minimal valid lock matching valid/skills.toml and the pinned fixture revision.
+schema = 1
+
+[manifest]
+sha256 = "sha256:62632ea44bdf0742469a590f46217c20c5c647fa95bde4d2f15484bcee977c5d"
+
+[[source]]
+id = "canonical"
+kind = "git"
+repository = "kostahuffman/agent-skills"
+requested_ref = "86e73f54d828da12ee337ffca28fcbf94355bc50"
+commit = "86e73f54d828da12ee337ffca28fcbf94355bc50"
+path = "skills"
+catalogue_path = "catalogue.toml"
+
+[selection]
+profile = "minimal"
+skills = [
+  "code-review-and-quality",
+  "git-workflow-and-versioning",
+  "using-agent-skills",
+]
+
+[[shared]]
+id = "references"
+source = "canonical"
+path = "references"
+files = [
+  "definition-of-done.md",
+  "performance-checklist.md",
+  "security-checklist.md",
+]
+hash = "sha256:57e3489661f4a304e05f8b342a197349c227ced2eabe52f221f4d02ac735da5a"
+
+[[skill]]
+id = "code-review-and-quality"
+source = "canonical"
+path = "skills/code-review-and-quality"
+hash = "sha256:f1e49b846eb4fd53c3ca2923d1bcc26c9f90439c26e1ccbeefd2b03fa15d1b88"
+
+[[skill]]
+id = "git-workflow-and-versioning"
+source = "canonical"
+path = "skills/git-workflow-and-versioning"
+hash = "sha256:a61ce81e6871a3c4f1354abae66aeb9d29fe0f033a7ab28d24166c3d58a8f4cb"
+
+[[skill]]
+id = "using-agent-skills"
+source = "canonical"
+path = "skills/using-agent-skills"
+hash = "sha256:b1e6e27124efaf0acf7e08af6d2095603e521f9be5a77a9695df1b70cd1ba9d2"

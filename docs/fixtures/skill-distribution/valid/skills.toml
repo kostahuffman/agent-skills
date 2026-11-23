@@ -1,0 +1,17 @@
+# Minimal valid selection manifest. Pins the frozen fixture revision kept
+# reachable by the fixture/skill-distribution-v1 tag and resolves to three
+# canonical skills.
+schema = 1
+
+[source]
+repository = "kostahuffman/agent-skills"
+ref = "86e73f54d828da12ee337ffca28fcbf94355bc50"
+path = "skills"
+catalogue_path = "catalogue.toml"
+
+[selection]
+profile = "minimal"
+include = ["git-workflow-and-versioning"]
+
+[profiles.minimal]
+include = ["using-agent-skills", "code-review-and-quality"]
