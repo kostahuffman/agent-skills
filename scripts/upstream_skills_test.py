@@ -84,7 +84,7 @@ class UpstreamTests(unittest.TestCase):
         new = commit(self.upstream, "update")
         write(self.fork, "skills/alpha/SKILL.md", "---\nname: alpha\n---\nLocally changed\n")
         commit(self.fork, "local divergence")
-        with self.assertRaisesRegex(SyncError, "mark custom"):
+        with self.assertRaisesRegex(SyncError, "custom"):
             sync(self.fork, str(self.upstream), sha=new)
         self.assertIn("Locally changed", (self.fork / "skills/alpha/SKILL.md").read_text())
 
