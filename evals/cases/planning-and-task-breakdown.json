@@ -13,6 +13,10 @@
       {
         "prompt": "Plan the work into implementable chunks before we start coding",
         "top_k": 3
+      },
+      {
+        "prompt": "Create GitHub issues for each task with acceptance criteria, dependencies, and parent links",
+        "top_k": 3
       }
     ],
     "negative": [

@@ -1,6 +1,6 @@
 ---
 name: git-workflow-and-versioning
-description: Structures git workflow practices. Use when making any code change. Use when committing, branching, resolving conflicts, splitting uncommitted work in a messy working tree into clean atomic commits, opening or reviewing a pull request (PR), pushing to a remote, or when you need to organize work across multiple parallel streams. Use when cutting a release, choosing a semantic version bump, tagging, or writing a changelog. Use when asked to write a commit message or a changelog entry for a change, or to split a change into commits, even when the diff is pasted inline and the message seems easy to write from it.
+description: Structures git workflow practices. Use when making any code change. Use when committing, branching, resolving conflicts, splitting uncommitted work in a messy working tree into clean atomic commits, opening or reviewing a pull request (PR), pushing to a remote, or when you need to organize work across multiple parallel streams. Use when opening or updating a PR that must link its issue, inherit labels, and include verification evidence. Use when cutting a release, choosing a semantic version bump, tagging, or writing a changelog. Use when asked to write a commit message or a changelog entry for a change, or to split a change into commits, even when the diff is pasted inline and the message seems easy to write from it.
 ---
 
 # Git Workflow and Versioning
@@ -117,6 +117,35 @@ Target ~100 lines per commit/PR. Changes over ~1000 lines should be split. See t
 ~300 lines  → Acceptable for a single logical change
 ~1000 lines → Split into smaller changes
 ```
+
+### 6. Pull Request Metadata
+
+A PR is a review artifact, not a commit dump. When the work closes or advances an issue, the metadata must say so without the reviewer hunting for it. Use the full contract in `../../references/github-issue-and-pr-contract.md`.
+
+**Title:** a conventional type plus an imperative summary. Do not put the issue number in the title.
+
+```
+feat: add email validation to registration
+fix(auth): reject expired refresh tokens
+docs: document the NatsClient migration
+```
+
+**First body line:** `Closes #N` when the PR completes the issue, or `Refs #N` when it only advances it. No heading before it and no trailing period. Additional issue links go on following lines before the first heading.
+
+```markdown
+Closes #78
+
+## Summary
+[What changed, why, and any user-visible behavior.]
+
+## Verification
+- `pytest tests/unit/test_nats.py -q` — 172 passed.
+- [Skipped or incomplete check: which test, why it did not run, and what remains unverified.]
+```
+
+**Labels:** copy the linked issue's labels to the PR. Add PR-specific labels only when the repository taxonomy requires them. Never leave a PR unlabeled when its issue has labels.
+
+**Verification evidence:** include the command and a concise result, not a claim. State skipped tests explicitly. "All tests pass" without a command or result is not evidence.
 
 ## Branching Strategy
 
@@ -323,6 +352,9 @@ Write the entry in the same change that makes the change, while the impact is fr
 | "It's just a small fix, bump the patch" | Check what consumers can observe. A behavior change they relied on is a major, whatever the diff size. |
 | "The changelog is just the commit log" | Commits are for you; the changelog is for consumers, curated by impact. Generating one from raw commits buries what matters. |
 | "We'll write the changelog at release time" | By then the impact is reconstructed from memory and half of it is missing. Write the entry with the change. |
+| "The issue number in the title is enough" | GitHub reads the first body line, not the title. Use `Closes #N` or `Refs #N` before any heading. |
+| "Labels are cosmetic" | Labels route reviewers, release notes, and automation. Inherit the issue's labels when you open the PR. |
+| "I'll add verification after review" | Verification is the review gate. Without a command and result, the reviewer is trusting a claim. |
 
 ## Red Flags
 
@@ -336,6 +368,11 @@ Write the entry in the same change that makes the change, while the impact is fr
 - A breaking change shipped under a minor or patch version bump
 - A release with no tag, or a version number hand-edited out of sync with the tag
 - A user-facing release with no changelog entry, or a changelog that's just dumped commit messages
+- A PR with an issue number in the title instead of a `Closes`/`Refs` line
+- `Closes #N` buried at the bottom of the PR body, or written with a trailing period
+- A PR with empty labels while its linked issue has labels
+- A PR that claims tests pass without the command and result
+- Skipped or incomplete tests that are not named in the verification section
 
 ## Verification
 
@@ -347,6 +384,14 @@ For every commit:
 - [ ] No secrets in the diff
 - [ ] No formatting-only changes mixed with behavior changes
 - [ ] `.gitignore` covers standard exclusions
+
+For every pull request:
+
+- [ ] Title is conventional, imperative, and contains no issue number
+- [ ] The first nonblank body line is `Closes #N` or `Refs #N`, with no trailing period
+- [ ] PR labels match the linked issue
+- [ ] `## Summary` and `## Verification` are present
+- [ ] Verification includes commands and results, plus explicit skipped or incomplete checks
 
 For every release (anything with consumers):
 
