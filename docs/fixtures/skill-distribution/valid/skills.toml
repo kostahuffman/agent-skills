@@ -1,0 +1,15 @@
+# Minimal valid selection manifest. Resolves to three canonical skills.
+schema = 1
+
+[source]
+repository = "kostahuffman/agent-skills"
+ref = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
+path = "skills"
+catalogue_path = "catalogue.toml"
+
+[selection]
+profile = "minimal"
+include = ["git-workflow-and-versioning"]
+
+[profiles.minimal]
+include = ["using-agent-skills", "code-review-and-quality"]

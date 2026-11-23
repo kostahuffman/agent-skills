@@ -1,0 +1,116 @@
+# Canonical skill catalogue for kostahuffman/agent-skills.
+#
+# A release commit of this file defines the stable skill identifiers consumers
+# may select and pins which content this fork owns versus mirrors from upstream.
+# Consumers pin the release commit in skills.lock.toml and never read this file
+# from a moving branch.
+#
+# See docs/skill-distribution.md for the contract.
+schema = 1
+
+[upstream]
+repository = "addyosmani/agent-skills"
+
+[[skill]]
+id = "accessibility-engineering"
+ownership = "upstream"
+
+[[skill]]
+id = "api-and-interface-design"
+ownership = "upstream"
+
+[[skill]]
+id = "browser-testing-with-devtools"
+ownership = "upstream"
+
+[[skill]]
+id = "ci-cd-and-automation"
+ownership = "upstream"
+
+[[skill]]
+id = "code-review-and-quality"
+ownership = "upstream"
+
+[[skill]]
+id = "code-simplification"
+ownership = "upstream"
+
+[[skill]]
+id = "constraint-driven-development"
+ownership = "upstream"
+
+[[skill]]
+id = "context-engineering"
+ownership = "upstream"
+
+[[skill]]
+id = "debugging-and-error-recovery"
+ownership = "upstream"
+
+[[skill]]
+id = "deprecation-and-migration"
+ownership = "upstream"
+
+[[skill]]
+id = "documentation-and-adrs"
+ownership = "upstream"
+
+[[skill]]
+id = "doubt-driven-development"
+ownership = "upstream"
+
+[[skill]]
+id = "frontend-ui-engineering"
+ownership = "upstream"
+
+[[skill]]
+id = "git-workflow-and-versioning"
+ownership = "upstream"
+
+[[skill]]
+id = "idea-refine"
+ownership = "upstream"
+
+[[skill]]
+id = "incremental-implementation"
+ownership = "upstream"
+
+[[skill]]
+id = "interview-me"
+ownership = "upstream"
+
+[[skill]]
+id = "observability-and-instrumentation"
+ownership = "upstream"
+
+[[skill]]
+id = "performance-optimization"
+ownership = "upstream"
+
+[[skill]]
+id = "planning-and-task-breakdown"
+ownership = "upstream"
+
+[[skill]]
+id = "security-and-hardening"
+ownership = "upstream"
+
+[[skill]]
+id = "shipping-and-launch"
+ownership = "upstream"
+
+[[skill]]
+id = "source-driven-development"
+ownership = "upstream"
+
+[[skill]]
+id = "spec-driven-development"
+ownership = "upstream"
+
+[[skill]]
+id = "test-driven-development"
+ownership = "upstream"
+
+[[skill]]
+id = "using-agent-skills"
+ownership = "upstream"

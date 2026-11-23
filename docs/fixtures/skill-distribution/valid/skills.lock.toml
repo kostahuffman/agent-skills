@@ -1,0 +1,40 @@
+# Minimal valid lock matching valid/skills.toml and the current repository content.
+schema = 1
+
+[manifest]
+sha256 = "sha256:95d5443302d17ec518686c336311cdd9697c4ec49e61b37787b88fc4b9ea18fa"
+
+[[source]]
+id = "canonical"
+kind = "git"
+repository = "kostahuffman/agent-skills"
+requested_ref = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
+commit = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
+path = "skills"
+catalogue_path = "catalogue.toml"
+
+[selection]
+profile = "minimal"
+skills = [
+  "code-review-and-quality",
+  "git-workflow-and-versioning",
+  "using-agent-skills",
+]
+
+[[skill]]
+id = "code-review-and-quality"
+source = "canonical"
+path = "skills/code-review-and-quality"
+hash = "sha256:f1e49b846eb4fd53c3ca2923d1bcc26c9f90439c26e1ccbeefd2b03fa15d1b88"
+
+[[skill]]
+id = "git-workflow-and-versioning"
+source = "canonical"
+path = "skills/git-workflow-and-versioning"
+hash = "sha256:a61ce81e6871a3c4f1354abae66aeb9d29fe0f033a7ab28d24166c3d58a8f4cb"
+
+[[skill]]
+id = "using-agent-skills"
+source = "canonical"
+path = "skills/using-agent-skills"
+hash = "sha256:b1e6e27124efaf0acf7e08af6d2095603e521f9be5a77a9695df1b70cd1ba9d2"
