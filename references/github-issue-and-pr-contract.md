@@ -16,14 +16,14 @@ Decomposition rules live in `planning-and-task-breakdown`; commit, branch, and r
 
 ### Title
 
-Use a short, imperative summary. If the repository uses area prefixes such as `[NATS]` or `[API]`, keep them. Do not use conventional-commit types such as `feat:` on an issue title; those belong on commits and PR titles.
+Use a short, imperative summary. Preserve the repository's existing issue-title convention: area prefixes such as `[NATS]` or `[API]`, and existing type prefixes such as `docs:` when that is the norm. Conventional-commit types are required for PR titles; do not impose them on issue titles unless the repository already uses them.
 
 ### Metadata
 
 | Field | Rule |
 |---|---|
 | Labels | At least one type label (`feature`, `bug`, `docs`, etc. per the repository taxonomy), plus area labels. A child issue inherits the parent's area labels unless there is a stated reason to differ. |
-| Parent | A child issue includes `Parent: #N`. A parent issue lists its children or uses GitHub sub-issues. |
+| Parent | A child issue links its parent. Use `Parent: #N` for the current repository, or `Parent: owner/repo#N` / `Parent: <issue URL>` for another repository. Prefer native GitHub sub-issues when available; a parent issue lists its children or uses sub-issues. |
 | Size | `S` = one focused session and roughly one file; `M` = up to about five files; `L`/`XL` = split before implementation. |
 | Task-list target | Use GitHub Issues or `tasks/todo.md`, not both. If GitHub Issues is selected, it is the task list; the plan document stays an ordered index. |
 
@@ -85,6 +85,8 @@ The first nonblank line of the PR body is exactly one of:
 
 - `Closes #N` — this PR completes issue `N`.
 - `Refs #N` — this PR makes progress but does not complete issue `N`.
+
+Use the short `#N` form for the current repository. For an issue in another repository, use `owner/repo#N` or the full issue URL after the keyword, for example `Closes owner/repo#N`. Prefer native GitHub sub-issue relationships when the linked work has them.
 
 No heading before it. No trailing period. If more than one issue is involved, put each `Closes`/`Refs` line before the first heading; the first nonblank line still names the primary issue.
 
@@ -228,17 +230,17 @@ available while services migrate.
 
 Before creating or updating an issue:
 
-- [ ] Title is an imperative summary with the repository's area prefix, if any.
+- [ ] Title is an imperative summary that preserves the repository's existing area or type prefix convention.
 - [ ] Goal, Scope, Out of scope, Acceptance criteria, Verification, Dependencies, and Likely files are present.
 - [ ] Executable issue is `S` or `M`; `L`/`XL` is split into child issues.
-- [ ] Child issues include `Parent: #N`; the parent lists its children.
+- [ ] Child issues link their parent with `Parent: #N` for this repository or `Parent: owner/repo#N` / an issue URL for another repository; the parent lists its children or uses native sub-issues.
 - [ ] Labels include a type and area; children inherit the parent's area labels.
 - [ ] GitHub Issues is the only task-list target, or `tasks/todo.md` is the only target.
 
 Before opening or updating a PR:
 
 - [ ] Title is conventional, imperative, and has no issue number.
-- [ ] First nonblank body line is `Closes #N` or `Refs #N`, with no trailing period.
+- [ ] First nonblank body line is `Closes` or `Refs` targeting a same-repo `#N`, a qualified `owner/repo#N`, or an issue URL, with no trailing period.
 - [ ] The `Closes`/`Refs` line targets the executable issue, not a tracking issue.
 - [ ] PR labels match the linked issue.
 - [ ] `## Summary` and `## Verification` are present.

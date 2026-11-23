@@ -312,7 +312,7 @@ Quick-reference material that skills pull in when needed:
 | Reference | Covers |
 |-----------|--------|
 | [definition-of-done.md](references/definition-of-done.md) | Project-wide standing bar every change clears, contrasted with per-task acceptance criteria |
-| [github-issue-and-pr-contract.md](references/github-issue-and-pr-contract.md) | Issue fields, parent/child links, labels, conventional PR titles, first-line `Closes`/`Refs`, and verification evidence |
+| [github-issue-and-pr-contract.md](references/github-issue-and-pr-contract.md) | Issue fields, same- and cross-repo parent/child links, labels, conventional PR titles, first-line `Closes`/`Refs`, and verification evidence |
 | [testing-patterns.md](references/testing-patterns.md) | Test structure, naming, mocking, React/API/E2E examples, anti-patterns (JavaScript/TypeScript) |
 | [security-checklist.md](references/security-checklist.md) | Pre-commit checks, auth, input validation, headers, CORS, OWASP Top 10 |
 | [performance-checklist.md](references/performance-checklist.md) | Core Web Vitals targets, frontend/backend checklists, measurement commands |

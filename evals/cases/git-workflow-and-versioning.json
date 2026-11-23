@@ -29,6 +29,10 @@
       {
         "prompt": "Open a PR with a conventional title, inherited labels, and Closes #N on the first line",
         "top_k": 3
+      },
+      {
+        "prompt": "Open a pull request that closes a cross-repository issue using owner/repo#N on the first line",
+        "top_k": 3
       }
     ],
     "negative": [

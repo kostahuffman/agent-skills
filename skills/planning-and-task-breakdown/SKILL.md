@@ -168,9 +168,10 @@ When using an external tracker, note it in `tasks/plan.md` (e.g. "Tasks tracked 
 When GitHub Issues is the selected task list target, use the contract in `../../references/github-issue-and-pr-contract.md`. Apply these rules:
 
 - Create one issue per task. Do not also write `tasks/todo.md`; keep `tasks/plan.md` as the ordered index of issue links.
+- Preserve the repository's issue-title convention, including area or type prefixes such as `[API]` or `docs:` when that is the norm.
 - Every issue includes Goal, Scope, Out of scope, Acceptance criteria, Verification, Dependencies, and Likely files.
 - Executable issues are `S` or `M` (roughly one to five files). Split `L`/`XL` work into child issues before implementation.
-- A child issue includes `Parent: #N`; a tracking issue lists its children and is not implemented directly.
+- A child issue links its parent with `Parent: #N` for the same repository, or `Parent: owner/repo#N` / an issue URL for another repository. Prefer native GitHub sub-issues when available; a tracking issue lists its children and is not implemented directly.
 - Labels include a type label and area labels. Children inherit the parent's area labels unless there is a stated reason to differ.
 - Record checkpoints as checkpoint issues or as a checklist in `tasks/plan.md`, not as duplicate task items.
 - Verification names executable commands and expected evidence, and calls out checks that cannot run.
@@ -253,7 +254,7 @@ When multiple agents or sessions are available:
 - GitHub Issues selected as the task list but tasks are also duplicated in `tasks/todo.md`
 - Issues with no acceptance criteria or no verification
 - `L`/`XL` issues that were not split into executable child issues
-- Child issues with no `Parent: #N` link, or a parent with no child links
+- Child issues with no parent link (same-repo `Parent: #N`, cross-repo `Parent: owner/repo#N`, or an issue URL), or a parent with no child links
 - Issues missing type or area labels
 - Tasks that say "implement the feature" without acceptance criteria
 - No verification steps in the plan

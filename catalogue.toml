@@ -19,7 +19,10 @@ ownership = "upstream"
 [[shared]]
 id = "references"
 path = "references"
-ownership = "upstream"
+ownership = "custom"
+upstream_path = "references"
+diverged_from = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
+note = "Adds the GitHub issue and PR contract reference."
 
 [[skill]]
 id = "accessibility-engineering"
@@ -75,7 +78,10 @@ ownership = "upstream"
 
 [[skill]]
 id = "git-workflow-and-versioning"
-ownership = "upstream"
+ownership = "custom"
+upstream_path = "skills/git-workflow-and-versioning"
+diverged_from = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
+note = "Adds GitHub issue and PR metadata guidance."
 
 [[skill]]
 id = "idea-refine"
@@ -99,7 +105,10 @@ ownership = "upstream"
 
 [[skill]]
 id = "planning-and-task-breakdown"
-ownership = "upstream"
+ownership = "custom"
+upstream_path = "skills/planning-and-task-breakdown"
+diverged_from = "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee"
+note = "Adds GitHub Issues decomposition and cross-repository linking guidance."
 
 [[skill]]
 id = "security-and-hardening"

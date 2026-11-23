@@ -130,7 +130,7 @@ fix(auth): reject expired refresh tokens
 docs: document the NatsClient migration
 ```
 
-**First body line:** `Closes #N` when the PR completes the issue, or `Refs #N` when it only advances it. No heading before it and no trailing period. Additional issue links go on following lines before the first heading.
+**First body line:** `Closes #N` when the PR completes the issue, or `Refs #N` when it only advances it. Use the short `#N` form for the current repository; for another repository, use `owner/repo#N` or the full issue URL. Prefer native GitHub sub-issue relationships when the linked work has them. No heading before it and no trailing period. Additional issue links go on following lines before the first heading.
 
 ```markdown
 Closes #78
@@ -352,7 +352,7 @@ Write the entry in the same change that makes the change, while the impact is fr
 | "It's just a small fix, bump the patch" | Check what consumers can observe. A behavior change they relied on is a major, whatever the diff size. |
 | "The changelog is just the commit log" | Commits are for you; the changelog is for consumers, curated by impact. Generating one from raw commits buries what matters. |
 | "We'll write the changelog at release time" | By then the impact is reconstructed from memory and half of it is missing. Write the entry with the change. |
-| "The issue number in the title is enough" | GitHub reads the first body line, not the title. Use `Closes #N` or `Refs #N` before any heading. |
+| "The issue number in the title is enough" | GitHub reads the first body line, not the title. Use `Closes`/`Refs` with a same-repo `#N`, qualified `owner/repo#N`, or issue URL before any heading. |
 | "Labels are cosmetic" | Labels route reviewers, release notes, and automation. Inherit the issue's labels when you open the PR. |
 | "I'll add verification after review" | Verification is the review gate. Without a command and result, the reviewer is trusting a claim. |
 
@@ -388,7 +388,7 @@ For every commit:
 For every pull request:
 
 - [ ] Title is conventional, imperative, and contains no issue number
-- [ ] The first nonblank body line is `Closes #N` or `Refs #N`, with no trailing period
+- [ ] The first nonblank body line uses `Closes`/`Refs` with a same-repo `#N`, qualified `owner/repo#N`, or issue URL, and has no trailing period
 - [ ] PR labels match the linked issue
 - [ ] `## Summary` and `## Verification` are present
 - [ ] Verification includes commands and results, plus explicit skipped or incomplete checks
