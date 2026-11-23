@@ -174,6 +174,9 @@ def sync(root: Path, remote: str, *, sha: str | None = None, dry_run: bool = Fal
     new = sha or latest_sha(root, remote)
     ensure_revision(root, remote, old, fetch=True)
     ensure_revision(root, remote, new, fetch=True)
+    # Preflight every upstream-owned path before changing anything, including
+    # paths untouched by the new revision.
+    validate(root, remote, fetch=False)
     # Do not overwrite a fork-owned skill. New upstream skills are explicitly
     # added to the catalogue for review; removed skills require manual action.
     before = file_tree(root, old, "skills")
@@ -214,7 +217,11 @@ def sync(root: Path, remote: str, *, sha: str | None = None, dry_run: bool = Fal
         if owner != "upstream":
             protected.append(path)
             continue
+        if any(part in ("", ".", "..") for part in path.split("/")) or "\\" in path:
+            raise SyncError(f"unsafe upstream path: {path!r}")
         target = root / path
+        if any(parent.is_symlink() for parent in list(target.parents) if parent != root and root in parent.parents):
+            raise SyncError(f"symlinked parent directory for {path}")
         expected = blob(root, old, path) if path in old_files else None
         if target.is_symlink() or (target.exists() and (expected is None or not target.is_file() or target.read_bytes() != expected)):
             raise SyncError(f"local changes at {path}; mark custom, do not overwrite")
