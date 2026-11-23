@@ -24,7 +24,7 @@ jobs:
 
       - name: Validate fork upstream provenance and release tag
         env:
-          FORK_RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          FORK_RELEASE_TAG: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && github.ref_name || '' }}
         shell: bash
         run: |
           set -euo pipefail
