@@ -1,6 +1,6 @@
 ---
 name: planning-and-task-breakdown
-description: Breaks work into ordered tasks. Use when you have a spec or clear requirements and need to break work into implementable tasks. Use when a task feels too large to start, when you need to estimate scope, or when parallel work is possible.
+description: Breaks work into ordered tasks. Use when you have a spec or clear requirements and need to break work into implementable tasks. Use when a task feels too large to start, when you need to estimate scope, or when parallel work is possible. Use when recording tasks as GitHub Issues, including parent/child links, labels, and acceptance criteria.
 ---
 
 # Planning and Task Breakdown
@@ -163,6 +163,19 @@ The task list target is where tasks and checkpoints are recorded. It is defined 
 
 When using an external tracker, note it in `tasks/plan.md` (e.g. "Tasks tracked in Linear project FOO") so downstream steps and future sessions know where to look, and keep the plan document's Task List section as an ordered index of tracker item IDs or links rather than a duplicate checklist.
 
+### GitHub Issues as the Task List
+
+When GitHub Issues is the selected task list target, use the contract in `../../references/github-issue-and-pr-contract.md`. Apply these rules:
+
+- Create one issue per task. Do not also write `tasks/todo.md`; keep `tasks/plan.md` as the ordered index of issue links.
+- Preserve the repository's issue-title convention, including area or type prefixes such as `[API]` or `docs:` when that is the norm.
+- Every issue includes Goal, Scope, Out of scope, Acceptance criteria, Verification, Dependencies, and Likely files.
+- Executable issues are `S` or `M` (roughly one to five files). Split `L`/`XL` work into child issues before implementation.
+- A child issue links its parent with `Parent: #N` for the same repository, or `Parent: owner/repo#N` / an issue URL for another repository. Prefer native GitHub sub-issues when available; a tracking issue lists its children and is not implemented directly.
+- Labels include a type label and area labels. Children inherit the parent's area labels unless there is a stated reason to differ.
+- Record checkpoints as checkpoint issues or as a checklist in `tasks/plan.md`, not as duplicate task items.
+- Verification names executable commands and expected evidence, and calls out checks that cannot run.
+
 ## Plan Document Template
 
 ```markdown
@@ -229,12 +242,20 @@ When multiple agents or sessions are available:
 | "Planning is overhead" | Planning is the task. Implementation without a plan is just typing. |
 | "I can hold it all in my head" | Context windows are finite. Written plans survive session boundaries and compaction. |
 | "The old `tasks/plan.md` is stale, I'll just replace it" | Unchecked tasks may be mid-build in another session. Overwriting them destroys work state that exists nowhere else. Stop and ask. |
+| "GitHub Issues is just a backlog; the real plan is in `tasks/todo.md`" | Pick one task list target. If GitHub Issues is selected, it is the task list; duplicating it across both creates two sources of truth. |
+| "Acceptance criteria are obvious" | They are the contract. Write observable criteria and the evidence that proves them. |
+| "I'll add labels and parent links later" | Labels route review and parent links make the plan navigable. Add them when the issue is created. |
 
 ## Red Flags
 
 - Starting implementation without a written task list
 - Overwriting a `tasks/plan.md` or `tasks/todo.md` that still has unchecked tasks for different work, without asking
 - Writing `tasks/todo.md` when the project has designated an external tracker (or scattering tasks across both)
+- GitHub Issues selected as the task list but tasks are also duplicated in `tasks/todo.md`
+- Issues with no acceptance criteria or no verification
+- `L`/`XL` issues that were not split into executable child issues
+- Child issues with no parent link (same-repo `Parent: #N`, cross-repo `Parent: owner/repo#N`, or an issue URL), or a parent with no child links
+- Issues missing type or area labels
 - Tasks that say "implement the feature" without acceptance criteria
 - No verification steps in the plan
 - All tasks are XL-sized
@@ -249,6 +270,10 @@ Before starting implementation, confirm:
 - [ ] Every task has a verification step
 - [ ] Task dependencies are identified and ordered correctly
 - [ ] Tasks are recorded in the task list target (default `tasks/todo.md`)
+- [ ] If GitHub Issues is the task list target, every task is an issue with Goal, Scope, Out of scope, Acceptance criteria, Verification, Dependencies, and Likely files
+- [ ] Executable issues are `S` or `M`; `L`/`XL` work is split into child issues
+- [ ] Child issues link to their parent and labels include type and area
+- [ ] No duplicate task list exists in `tasks/todo.md` when GitHub Issues is selected
 - [ ] No pre-existing incomplete plan was overwritten without explicit user confirmation
 - [ ] No task touches more than ~5 files
 - [ ] Checkpoints exist between major phases
@@ -257,3 +282,5 @@ Before starting implementation, confirm:
 ## See Also
 
 Acceptance criteria are per-task and answer "did we build the right thing?". They sit on top of the project-wide Definition of Done, the standing bar every task clears before it counts as done. See `../../references/definition-of-done.md`.
+
+When GitHub Issues is the selected task list, see `../../references/github-issue-and-pr-contract.md` for the issue fields and parent/child rules.
