@@ -755,12 +755,12 @@ Fixtures live under [`fixtures/skill-distribution/`](fixtures/skill-distribution
 | [`invalid/duplicate-name-catalogue.toml`](fixtures/skill-distribution/invalid/duplicate-name-catalogue.toml) | `config.duplicate_id`: the same identifier appears twice. |
 | [`invalid/ref-drift.lock.toml`](fixtures/skill-distribution/invalid/ref-drift.lock.toml) | `lock.ref_drift` when paired with `valid/skills.toml`: the lock requests a different ref. |
 
-The valid fixture pins `775a34162226fa4cb08ae981dd9da8b0b3f71806`, the commit
-that introduced `catalogue.toml`; the current release tag predates it. The
-resolver test reads `catalogue.toml`, the selected skills, and the shared
-resources from that pinned commit with `git cat-file` and `git show`, not from
-the PR checkout. Update the pin to the release commit before this contract is
-released, then regenerate the hashes.
+The valid fixture pins `86e73f54d828da12ee337ffca28fcbf94355bc50`, the commit
+that defines the shared-resource contract and contains `catalogue.toml`; the
+current release tag predates it. The resolver test reads `catalogue.toml`, the
+selected skills, and the shared resources from that pinned commit with
+`git cat-file` and `git show`, not from the PR checkout. Update the pin to the
+release commit before this contract is released, then regenerate the hashes.
 
 The valid lock's `manifest.sha256`, skill `hash` values, and `[[shared]]` hash
 are recomputed from the pinned commit. Regenerate them if the selected skills

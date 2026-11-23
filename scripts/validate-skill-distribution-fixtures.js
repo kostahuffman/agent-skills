@@ -505,6 +505,7 @@ function validateValidFixture(manifest, lock, catalogue, manifestPath) {
 function validateInvalidFixtures(catalogue, validManifest, validLock, manifestPath) {
   const missing = parseToml(fs.readFileSync(path.join(ROOT, `${INVALID}/missing-skill.toml`), 'utf8'), `${INVALID}/missing-skill.toml`);
   assert(/^[0-9a-f]{40}$/.test(missing.source && missing.source.ref), 'missing-skill fixture must pin a full SHA');
+  assert(treeExists(missing.source.ref, validManifest.source.catalogue_path || 'catalogue.toml'), 'missing-skill fixture must pin a commit containing the catalogue');
   const byId = new Set(catalogue.skill.map((skill) => skill.id));
   const profile = missing.profiles && missing.profiles[missing.selection && missing.selection.profile];
   const includes = [...((profile && profile.include) || []), ...((missing.selection && missing.selection.include) || [])];

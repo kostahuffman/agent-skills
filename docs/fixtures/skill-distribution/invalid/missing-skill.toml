@@ -3,7 +3,7 @@ schema = 1
 
 [source]
 repository = "kostahuffman/agent-skills"
-ref = "775a34162226fa4cb08ae981dd9da8b0b3f71806"
+ref = "86e73f54d828da12ee337ffca28fcbf94355bc50"
 
 [selection]
 profile = "python-service"
