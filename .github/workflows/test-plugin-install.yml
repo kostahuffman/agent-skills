@@ -19,6 +19,21 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Test safe upstream sync without network
+        run: python3 -m unittest discover -s scripts -p 'upstream_skills_test.py'
+
+      - name: Validate fork upstream provenance and release tag
+        env:
+          FORK_RELEASE_TAG: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && github.ref_name || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$FORK_RELEASE_TAG" ]]; then
+            python3 scripts/upstream_skills.py validate --fetch --tag "$FORK_RELEASE_TAG"
+          else
+            python3 scripts/upstream_skills.py validate --fetch
+          fi
+
       - name: Validate all skills
         run: node scripts/validate-skills.js
 
