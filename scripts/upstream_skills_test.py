@@ -92,15 +92,25 @@ class UpstreamTests(unittest.TestCase):
         write(self.upstream, "skills/alpha/SKILL.md", "---\nname: alpha\n---\nUpdated\n")
         new = commit(self.upstream, "update")
         file = self.fork / "catalogue.toml"
-        file.write_text(file.read_text().replace('ownership = "upstream"\n', 'ownership = "custom"\n', 1))
+        file.write_text(file.read_text().replace(
+            'ownership = "upstream"\n',
+            f'ownership = "custom"\nupstream_path = "references"\ndiverged_from = "{self.baseline}"\n',
+            1,
+        ))
         # Shared root is custom, skill remains upstream: change the latter too.
         file.write_text(file.read_text().replace(
             '[[skill]]\nid = "alpha"\nownership = "upstream"',
-            '[[skill]]\nid = "alpha"\nownership = "custom"',
+            f'[[skill]]\nid = "alpha"\nownership = "custom"\n'
+            f'upstream_path = "skills/alpha"\ndiverged_from = "{self.baseline}"',
         ))
         commit(self.fork, "protect custom skill")
         sync(self.fork, str(self.upstream), sha=new)
         self.assertIn("Original", (self.fork / "skills/alpha/SKILL.md").read_text())
+
+    def test_rejects_unlisted_skill_directories(self) -> None:
+        write(self.fork, "skills/unlisted/SKILL.md", "---\nname: unlisted\n---\n")
+        with self.assertRaisesRegex(SyncError, "unlisted"):
+            validate(self.fork, str(self.upstream), fetch=False)
 
     def test_release_tag_must_point_to_head(self) -> None:
         git(self.fork, "tag", "v0.1.0")
