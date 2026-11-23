@@ -204,17 +204,13 @@ function parseToml(text, file) {
 }
 
 function normalizeContent(buffer) {
-  const out = Buffer.alloc(buffer.length);
-  let offset = 0;
-  for (let i = 0; i < buffer.length; i++) {
-    if (buffer[i] === 0x0d) {
-      if (buffer[i + 1] === 0x0a) i++;
-      out[offset++] = 0x0a;
-    } else {
-      out[offset++] = buffer[i];
-    }
+  let text;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buffer);
+  } catch {
+    return buffer;
   }
-  return out.subarray(0, offset);
+  return Buffer.from(text.replace(/\r\n?/g, '\n'), 'utf8');
 }
 
 function assertSafePath(value, label) {
@@ -235,44 +231,90 @@ function assertSafePath(value, label) {
   );
 }
 
-function git(args, options = {}) {
-  return execFileSync('git', ['-C', ROOT, ...args], {
+function git(args, options = {}, repo = ROOT) {
+  return execFileSync('git', ['-C', repo, ...args], {
     maxBuffer: 20 * 1024 * 1024,
     ...options,
   });
 }
 
-function gitText(args) {
-  return git(args, { encoding: 'utf8' });
+function gitText(args, repo = ROOT) {
+  return git(args, { encoding: 'utf8' }, repo);
 }
 
-function treeFiles(commit, treePath) {
-  const output = gitText(['ls-tree', '-r', '--name-only', commit, '--', treePath]).trim();
+function treeFiles(commit, treePath, repo = ROOT) {
+  const output = gitText(['ls-tree', '-r', '--name-only', commit, '--', treePath], repo).trim();
   return output ? output.split('\n') : [];
 }
 
-function treeExists(commit, filePath) {
+function treeExists(commit, filePath, repo = ROOT) {
   try {
-    git(['cat-file', '-e', `${commit}:${filePath}`]);
+    git(['cat-file', '-e', `${commit}:${filePath}`], {}, repo);
     return true;
   } catch {
     return false;
   }
 }
 
-function treeType(commit, filePath) {
+function treeType(commit, filePath, repo = ROOT) {
   try {
-    return gitText(['cat-file', '-t', `${commit}:${filePath}`]).trim();
+    return gitText(['cat-file', '-t', `${commit}:${filePath}`], repo).trim();
   } catch {
     return null;
   }
 }
 
-function treeContent(commit, filePath) {
-  return git(['show', `${commit}:${filePath}`]);
+function treeContent(commit, filePath, repo = ROOT) {
+  return git(['show', `${commit}:${filePath}`], {}, repo);
 }
 
-function contentHash(rootPath, files, commit) {
+function gitSource(repo, commit) {
+  return {
+    type: (filePath) => treeType(commit, filePath, repo),
+    exists: (filePath) => treeExists(commit, filePath, repo),
+    files: (treePath) => treeFiles(commit, treePath, repo),
+    content: (filePath) => treeContent(commit, filePath, repo),
+  };
+}
+
+function walkFiles(rootPath) {
+  const files = [];
+  function visit(relative) {
+    for (const entry of fs.readdirSync(path.join(ROOT, relative), { withFileTypes: true })) {
+      const child = `${relative}/${entry.name}`;
+      if (entry.isDirectory()) visit(child);
+      else if (entry.isFile()) files.push(child);
+    }
+  }
+  visit(rootPath);
+  return files;
+}
+
+function workingTreeSource() {
+  return {
+    type(relative) {
+      try {
+        const stat = fs.statSync(path.join(ROOT, relative));
+        if (stat.isDirectory()) return 'tree';
+        if (stat.isFile()) return 'blob';
+        return null;
+      } catch {
+        return null;
+      }
+    },
+    exists(relative) {
+      return fs.existsSync(path.join(ROOT, relative));
+    },
+    files(treePath) {
+      return walkFiles(treePath);
+    },
+    content(relative) {
+      return fs.readFileSync(path.join(ROOT, relative));
+    },
+  };
+}
+
+function contentHash(rootPath, files, source) {
   const entries = files
     .map((file) => ({ file, relative: path.posix.relative(rootPath, file) }))
     .sort((a, b) => Buffer.compare(Buffer.from(a.relative), Buffer.from(b.relative)));
@@ -280,7 +322,7 @@ function contentHash(rootPath, files, commit) {
   for (const entry of entries) {
     digest.update(Buffer.from(entry.relative, 'utf8'));
     digest.update(Buffer.from([0]));
-    digest.update(normalizeContent(treeContent(commit, entry.file)));
+    digest.update(normalizeContent(source.content(entry.file)));
   }
   return `sha256:${digest.digest('hex')}`;
 }
@@ -305,7 +347,7 @@ function unique(values, label) {
   }
 }
 
-function validateCatalogue(catalogue, commit, sourcePath) {
+function validateCatalogue(catalogue, sourcePath, source) {
   assert(catalogue.schema === 1, 'catalogue schema must be 1');
   assert(catalogue.upstream && typeof catalogue.upstream.repository === 'string', 'catalogue upstream.repository is required');
   assert(Array.isArray(catalogue.skill) && catalogue.skill.length > 0, 'catalogue skill entries are required');
@@ -324,18 +366,18 @@ function validateCatalogue(catalogue, commit, sourcePath) {
     assert(skillPath.startsWith(`${sourcePath}/`) && skillPath.endsWith(`/${skill.id}`), `skill path must be under ${sourcePath} and end with /${skill.id}: ${skillPath}`);
     assert(!skillPaths.has(skillPath), `duplicate skill path: ${skillPath}`);
     skillPaths.add(skillPath);
-    assert(treeType(commit, skillPath) === 'tree', `skill path missing at pinned commit: ${skillPath}`);
+    assert(source.type(skillPath) === 'tree', `skill path missing: ${skillPath}`);
 
     const skillFile = `${skillPath}/SKILL.md`;
-    assert(treeExists(commit, skillFile), `missing ${skillFile} at pinned commit`);
-    assert(frontmatterName(treeContent(commit, skillFile).toString('utf8')) === skill.id, `frontmatter name mismatch for ${skill.id}`);
+    assert(source.exists(skillFile), `missing ${skillFile}`);
+    assert(frontmatterName(source.content(skillFile).toString('utf8')) === skill.id, `frontmatter name mismatch for ${skill.id}`);
 
     if (skill.ownership === 'upstream') assert(skill.diverged_from === undefined, `upstream skill ${skill.id} must not declare diverged_from`);
     if (skill.diverged_from !== undefined) assert(typeof skill.diverged_from === 'string' && skill.diverged_from.length > 0, `invalid diverged_from for ${skill.id}`);
   }
 
   const directories = new Set();
-  for (const file of treeFiles(commit, sourcePath)) {
+  for (const file of source.files(sourcePath)) {
     const parts = file.split('/');
     if (parts.length >= 2) directories.add(parts[1]);
   }
@@ -359,7 +401,7 @@ function validateCatalogue(catalogue, commit, sourcePath) {
       assert(!resource.path.startsWith(`${other}/`) && !other.startsWith(`${resource.path}/`), `shared paths overlap: ${other} and ${resource.path}`);
     }
     sharedPaths.push(resource.path);
-    assert(treeType(commit, resource.path) === 'tree', `shared path missing at pinned commit: ${resource.path}`);
+    assert(source.type(resource.path) === 'tree', `shared path missing: ${resource.path}`);
     if (resource.ownership === 'upstream') assert(resource.diverged_from === undefined, `upstream shared ${resource.id} must not declare diverged_from`);
   }
 
@@ -411,13 +453,13 @@ function stripFences(text) {
     .join('\n');
 }
 
-function discoverShared(selected, sharedRoots, commit, sourcePath) {
+function discoverShared(selected, sharedRoots, sourcePath, source) {
   const required = new Map();
   for (const id of selected) {
     const skillPath = `${sourcePath}/${id}`;
-    for (const file of treeFiles(commit, skillPath)) {
+    for (const file of source.files(skillPath)) {
       if (!file.endsWith('.md')) continue;
-      const text = stripFences(treeContent(commit, file).toString('utf8'));
+      const text = stripFences(source.content(file).toString('utf8'));
       for (const match of text.matchAll(SHARED_LINK_RE)) {
         const raw = match[0];
         const token = raw.split('#')[0];
@@ -425,8 +467,8 @@ function discoverShared(selected, sharedRoots, commit, sourcePath) {
         if (resolved === '..' || resolved.startsWith('../')) fail(`shared.outside_root: ${file} -> ${raw}`);
         const root = sharedRoots.find((resource) => resolved === resource.path || resolved.startsWith(`${resource.path}/`));
         if (!root) fail(`shared.outside_root: ${file} -> ${raw}`);
-        if (!treeExists(commit, resolved)) fail(`shared.missing: ${file} -> ${raw}`);
-        if (treeType(commit, resolved) !== 'blob') fail(`shared.outside_root: ${file} -> ${raw} is not a regular file`);
+        if (!source.exists(resolved)) fail(`shared.missing: ${file} -> ${raw}`);
+        if (source.type(resolved) !== 'blob') fail(`shared.outside_root: ${file} -> ${raw} is not a regular file`);
         if (!required.has(root.id)) required.set(root.id, new Set());
         required.get(root.id).add(path.posix.relative(root.path, resolved));
       }
@@ -442,21 +484,21 @@ function discoverShared(selected, sharedRoots, commit, sourcePath) {
       source: 'canonical',
       path: root.path,
       files: sorted,
-      hash: contentHash(root.path, sorted.map((file) => `${root.path}/${file}`), commit),
+      hash: contentHash(root.path, sorted.map((file) => `${root.path}/${file}`), source),
     });
   }
   return result;
 }
 
-function validateValidFixture(manifest, lock, catalogue, manifestPath) {
+function validateValidFixture(manifest, lock, catalogue, manifestPath, source) {
   const commit = manifest.source.ref;
   const sourcePath = manifest.source.path || 'skills';
   const cataloguePath = manifest.source.catalogue_path || 'catalogue.toml';
-  assert(treeExists(commit, cataloguePath), `pinned commit ${commit} lacks ${cataloguePath}`);
+  assert(source.exists(cataloguePath), `pinned commit ${commit} is unavailable or lacks ${cataloguePath}; fetch the pinned revision or fixture tag`);
 
-  const { shared: sharedRoots } = validateCatalogue(catalogue, commit, sourcePath);
+  const { shared: sharedRoots } = validateCatalogue(catalogue, sourcePath, source);
   const selected = resolveSelection(manifest, catalogue);
-  const expectedShared = discoverShared(selected, sharedRoots, commit, sourcePath);
+  const expectedShared = discoverShared(selected, sharedRoots, sourcePath, source);
 
   assert(lock.schema === 1, 'lock schema must be 1');
   assert(lock.manifest && lock.manifest.sha256 === fileHash(manifestPath), 'lock.stale_manifest');
@@ -483,7 +525,7 @@ function validateValidFixture(manifest, lock, catalogue, manifestPath) {
     assert(entry.source === 'canonical', `lock skill source mismatch: ${id}`);
     const skillPath = `${sourcePath}/${id}`;
     assert(entry.path === skillPath, `lock skill path mismatch: ${id}`);
-    const expectedHash = contentHash(skillPath, treeFiles(commit, skillPath), commit);
+    const expectedHash = contentHash(skillPath, source.files(skillPath), source);
     assert(entry.hash === expectedHash, `lock.hash_mismatch: ${id}`);
   }
 
@@ -502,10 +544,11 @@ function validateValidFixture(manifest, lock, catalogue, manifestPath) {
   return { selected, shared: expectedShared };
 }
 
-function validateInvalidFixtures(catalogue, validManifest, validLock, manifestPath) {
+function validateInvalidFixtures(catalogue, validManifest, validLock, manifestPath, source) {
   const missing = parseToml(fs.readFileSync(path.join(ROOT, `${INVALID}/missing-skill.toml`), 'utf8'), `${INVALID}/missing-skill.toml`);
   assert(/^[0-9a-f]{40}$/.test(missing.source && missing.source.ref), 'missing-skill fixture must pin a full SHA');
-  assert(treeExists(missing.source.ref, validManifest.source.catalogue_path || 'catalogue.toml'), 'missing-skill fixture must pin a commit containing the catalogue');
+  assert(missing.source.ref === validManifest.source.ref, 'missing-skill fixture must pin the valid fixture revision');
+  assert(source.exists(validManifest.source.catalogue_path || 'catalogue.toml'), 'missing-skill fixture must pin a commit containing the catalogue');
   const byId = new Set(catalogue.skill.map((skill) => skill.id));
   const profile = missing.profiles && missing.profiles[missing.selection && missing.selection.profile];
   const includes = [...((profile && profile.include) || []), ...((missing.selection && missing.selection.include) || [])];
@@ -544,23 +587,26 @@ function main() {
   }
 
   const workingCatalogue = parseToml(fs.readFileSync(path.join(ROOT, 'catalogue.toml'), 'utf8'), 'catalogue.toml');
+  validateCatalogue(workingCatalogue, 'skills', workingTreeSource());
+
   const manifest = parseToml(fs.readFileSync(path.join(ROOT, VALID_MANIFEST), 'utf8'), VALID_MANIFEST);
   const commit = manifest.source && manifest.source.ref;
   assert(/^[0-9a-f]{40}$/.test(commit), 'valid fixture must pin a full SHA');
   const sourcePath = manifest.source.path || 'skills';
   const cataloguePath = manifest.source.catalogue_path || 'catalogue.toml';
-  assert(treeExists(commit, cataloguePath), `pinned commit ${commit} lacks ${cataloguePath}`);
-  const pinnedCatalogue = parseToml(treeContent(commit, cataloguePath).toString('utf8'), `${commit}:${cataloguePath}`);
-  assert(JSON.stringify(pinnedCatalogue) === JSON.stringify(workingCatalogue), 'pinned catalogue differs from the working tree catalogue');
+  const source = gitSource(ROOT, commit);
+  assert(source.exists(cataloguePath), `pinned commit ${commit} is unavailable or lacks ${cataloguePath}; fetch the pinned revision or fixture tag`);
+  const pinnedCatalogue = parseToml(source.content(cataloguePath).toString('utf8'), `${commit}:${cataloguePath}`);
 
-  validateCatalogue(pinnedCatalogue, commit, sourcePath);
+  validateCatalogue(pinnedCatalogue, sourcePath, source);
   const lock = parseToml(fs.readFileSync(path.join(ROOT, VALID_LOCK), 'utf8'), VALID_LOCK);
-  const { selected, shared } = validateValidFixture(manifest, lock, pinnedCatalogue, VALID_MANIFEST);
-  validateInvalidFixtures(pinnedCatalogue, manifest, lock, VALID_MANIFEST);
+  const { selected, shared } = validateValidFixture(manifest, lock, pinnedCatalogue, VALID_MANIFEST, source);
+  validateInvalidFixtures(pinnedCatalogue, manifest, lock, VALID_MANIFEST, source);
   const sharedFileCount = [...shared.values()].reduce((total, resource) => total + resource.files.length, 0);
 
   console.log('Skill distribution fixtures');
-  console.log(`  ✓ catalogue.toml (${pinnedCatalogue.skill.length} skills, ${(pinnedCatalogue.shared || []).length} shared roots)`);
+  console.log(`  ✓ catalogue.toml (current: ${workingCatalogue.skill.length} skills, ${(workingCatalogue.shared || []).length} shared roots)`);
+  console.log(`  ✓ pinned fixture ${commit.slice(0, 7)} (${pinnedCatalogue.skill.length} skills, ${(pinnedCatalogue.shared || []).length} shared roots)`);
   console.log(`  ✓ ${VALID_MANIFEST} (${selected.length} selected skills)`);
   console.log(`  ✓ ${VALID_LOCK} (${shared.size} shared roots, ${sharedFileCount} shared files)`);
   console.log(`  ✓ ${INVALID}/missing-skill.toml (selection.unknown_skill)`);

@@ -4,7 +4,7 @@
 schema = 1
 
 [manifest]
-sha256 = "sha256:e43559ee2af7d5a4d10ac1936c1e71222f71d0b28ead97812ef76fb39777feb6"
+sha256 = "sha256:62632ea44bdf0742469a590f46217c20c5c647fa95bde4d2f15484bcee977c5d"
 
 [[source]]
 id = "canonical"

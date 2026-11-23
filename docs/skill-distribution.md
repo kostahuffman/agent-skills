@@ -480,7 +480,8 @@ is specified explicitly below because host path ordering is not portable.
 5. For each file: update with the POSIX relative path bytes, then `0x00`, then
    the normalized content bytes.
 6. Normalize UTF-8 content by replacing CRLF and CR with LF, then encoding as
-   UTF-8. Non-UTF-8 content is hashed as raw bytes.
+   UTF-8. Decoding is strict: a file is normalized only when the entire byte
+   sequence is valid UTF-8. Non-UTF-8 content is hashed as raw bytes.
 7. Encode as `sha256:` followed by lowercase hex.
 
 Empty directories are not hashed. File modes and executable bits are not
@@ -749,28 +750,32 @@ Fixtures live under [`fixtures/skill-distribution/`](fixtures/skill-distribution
 
 | Fixture | Expected result |
 |---|---|
-| [`valid/skills.toml`](fixtures/skill-distribution/valid/skills.toml) | Valid manifest; pins a commit containing `catalogue.toml` and selects three canonical skills using a profile plus a top-level include. |
-| [`valid/skills.lock.toml`](fixtures/skill-distribution/valid/skills.lock.toml) | Valid lock matching the valid manifest, the pinned commit content hashes, and the shared references required by the selected skills. |
+| [`valid/skills.toml`](fixtures/skill-distribution/valid/skills.toml) | Valid manifest; pins a frozen fixture revision containing `catalogue.toml` and selects three canonical skills using a profile plus a top-level include. |
+| [`valid/skills.lock.toml`](fixtures/skill-distribution/valid/skills.lock.toml) | Valid lock matching the valid manifest, the pinned fixture revision's content hashes, and the shared references required by the selected skills. |
 | [`invalid/missing-skill.toml`](fixtures/skill-distribution/invalid/missing-skill.toml) | `selection.unknown_skill`: the profile names a skill absent from the catalogue. |
 | [`invalid/duplicate-name-catalogue.toml`](fixtures/skill-distribution/invalid/duplicate-name-catalogue.toml) | `config.duplicate_id`: the same identifier appears twice. |
 | [`invalid/ref-drift.lock.toml`](fixtures/skill-distribution/invalid/ref-drift.lock.toml) | `lock.ref_drift` when paired with `valid/skills.toml`: the lock requests a different ref. |
 
-The valid fixture pins `86e73f54d828da12ee337ffca28fcbf94355bc50`, the commit
-that defines the shared-resource contract and contains `catalogue.toml`; the
-current release tag predates it. The resolver test reads `catalogue.toml`, the
-selected skills, and the shared resources from that pinned commit with
-`git cat-file` and `git show`, not from the PR checkout. Update the pin to the
-release commit before this contract is released, then regenerate the hashes.
+The valid fixture pins `86e73f54d828da12ee337ffca28fcbf94355bc50`, a frozen
+historical revision kept reachable by the `fixture/skill-distribution-v1` tag.
+The fixture is intentionally independent of the current catalogue: the resolver
+validates `catalogue.toml` from the working tree separately, then reads the
+pinned catalogue, selected skills, and shared resources from the pinned
+revision with `git cat-file` and `git show`. New catalogue entries do not
+require re-pinning this fixture. Regenerate its lock hashes only when the
+selected fixture content changes. Checkouts used to run the resolver MUST make
+the pinned revision available, for example by fetching tags; a shallow clone
+that omits it fails with an actionable message.
 
 The valid lock's `manifest.sha256`, skill `hash` values, and `[[shared]]` hash
-are recomputed from the pinned commit. Regenerate them if the selected skills
+are recomputed from the pinned revision. Regenerate them if the selected skills
 or required shared files change. Installer tests SHOULD copy the fixtures and
 assert the error class and exit status rather than the exact message text.
 
 The fixture resolver is `node scripts/validate-skill-distribution-fixtures.js`.
-It validates the catalogue, resolves the valid fixture against the pinned
-commit, checks the shared reference set and hashes, and confirms the intended
-error condition in each invalid fixture.
+It validates the current catalogue from the working tree, resolves the valid
+fixture against the frozen pinned revision, checks the shared reference set and
+hashes, and confirms the intended error condition in each invalid fixture.
 
 ## 11. Compatibility and migration
 
@@ -783,6 +788,11 @@ error condition in each invalid fixture.
   them, including moving `skills/sources.toml`. The contract does not migrate
   content. Consumers with tracked files under a catalogue-declared shared root
   must move or untrack them before installing a skill that requires that root.
+  Shared roots are top-level paths such as `references/` and `agents/`, so
+  treating them as managed install roots is a deliberate ownership trade-off.
+  The installer MUST only write inside roots marked `.skills-managed` and MUST
+  NOT delete or overwrite unmarked files. Downstream installer work MUST
+  confirm this trade-off before enabling automatic shared-root ignores.
 - Newly vended projects ship `skills.toml`, `skills.lock.toml`,
   `skills.sources.toml` when external sources are used, the installer entry
   point, agent guidance, and the ignore rules for the skill roots and the
@@ -822,14 +832,18 @@ Before accepting this contract:
 
 - [ ] The catalogue lists every current skill exactly once and every
       `SKILL.md` frontmatter name matches.
-- [ ] Every catalogue-declared shared root exists at the release commit, and
-      shared identifiers and paths are unique and non-overlapping.
+- [ ] Every catalogue-declared shared root exists in the current repository and
+      at the pinned fixture revision, and shared identifiers and paths are
+      unique and non-overlapping.
+- [ ] The current catalogue is validated separately from the pinned fixture
+      revision, so adding catalogue entries does not invalidate the fixture.
 - [ ] The valid manifest resolves to exactly the selected identifiers in the
       valid lock, with no duplicates.
 - [ ] The valid lock's manifest hash matches `valid/skills.toml`, and every
-      skill hash matches the pinned commit content, not the PR checkout.
-- [ ] The pinned commit contains `catalogue.toml` and every selected skill and
-      required shared file.
+      skill hash matches the pinned fixture revision's content, not the PR
+      checkout.
+- [ ] The pinned fixture revision contains `catalogue.toml` and every selected
+      skill and required shared file.
 - [ ] The valid lock's `[[shared]]` entry matches the shared references
       discovered from the selected skills, including the exact file set and
       hash.

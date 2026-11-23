@@ -2,10 +2,12 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 const {
+  contentHash,
   normalizeContent,
   parseToml,
   resolveSelection,
@@ -53,9 +55,30 @@ test('rejects duplicate keys', () => {
   );
 });
 
-test('normalizes CRLF and lone CR to LF without altering other bytes', () => {
+test('normalizes CRLF and lone CR to LF in valid UTF-8', () => {
+  const input = Buffer.from([0x61, 0x0d, 0x0a, 0x62, 0x0d, 0x63, 0x00]);
+  assert.deepEqual([...normalizeContent(input)], [0x61, 0x0a, 0x62, 0x0a, 0x63, 0x00]);
+});
+
+test('preserves non-UTF-8 bytes exactly', () => {
   const input = Buffer.from([0x61, 0x0d, 0x0a, 0x62, 0x0d, 0x63, 0x00, 0xff]);
-  assert.deepEqual([...normalizeContent(input)], [0x61, 0x0a, 0x62, 0x0a, 0x63, 0x00, 0xff]);
+  assert.deepEqual([...normalizeContent(input)], [...input]);
+});
+
+test('normalizes CRLF around multibyte UTF-8 without changing characters', () => {
+  const input = Buffer.from('\u00e9\r\n\u4f60\u597d\r', 'utf8');
+  assert.deepEqual([...normalizeContent(input)], [...Buffer.from('\u00e9\n\u4f60\u597d\n', 'utf8')]);
+});
+
+test('contentHash hashes non-UTF-8 content as raw bytes', () => {
+  const bytes = Buffer.from([0x61, 0x0d, 0x0a, 0xff]);
+  const source = { content: () => bytes };
+  const expected = `sha256:${crypto
+    .createHash('sha256')
+    .update(Buffer.from('file.bin\0'))
+    .update(bytes)
+    .digest('hex')}`;
+  assert.equal(contentHash('root', ['root/file.bin'], source), expected);
 });
 
 test('resolves profile includes, top-level includes, and excludes', () => {
