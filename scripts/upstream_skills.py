@@ -91,15 +91,37 @@ def catalogue(root: Path) -> dict:
     ids: set[str] = set()
     for item in data.get("skill", []):
         name = item.get("id", "")
-        if not SKILL.fullmatch(name) or name.lower() in ids:
+        if not isinstance(name, str) or not SKILL.fullmatch(name) or name.lower() in ids:
             raise SyncError(f"invalid or duplicate skill identifier: {name!r}")
         ids.add(name.lower())
         if item.get("ownership") not in ("custom", "upstream"):
             raise SyncError(f"invalid ownership for skill {name}")
+        if item.get("path", f"skills/{name}") != f"skills/{name}":
+            raise SyncError(f"skill path must resolve to skills/{name}")
+    actual = {
+        child.name.lower()
+        for child in (root / "skills").iterdir()
+        if child.is_dir()
+    }
+    if ids != actual:
+        raise SyncError(
+            f"catalogue missing/extra skill directories: "
+            f"unlisted={sorted(actual - ids)}, absent={sorted(ids - actual)}"
+        )
+    paths: list[str] = []
+    shared_ids: set[str] = set()
     for item in data.get("shared", []):
         path = item.get("path", "")
-        if not path or "/" in path or path.startswith(".") or path == "skills":
+        ident = item.get("id", "")
+        if not isinstance(ident, str) or not SKILL.fullmatch(ident) or ident.lower() in shared_ids:
+            raise SyncError(f"invalid/duplicate shared id: {ident!r}")
+        shared_ids.add(ident.lower())
+        parts = path.split("/") if isinstance(path, str) else []
+        if not parts or any(part in ("", ".", "..") for part in parts) or "\\" in path or path.startswith("skills/") or path == "skills":
             raise SyncError(f"unsafe shared path: {path!r}")
+        if any(path == other or path.startswith(other + "/") or other.startswith(path + "/") for other in paths):
+            raise SyncError(f"overlapping shared paths: {path!r}")
+        paths.append(path)
         if item.get("ownership") not in ("custom", "upstream"):
             raise SyncError(f"invalid ownership for shared root {path}")
     return data
@@ -136,9 +158,13 @@ def validate(root: Path, remote: str, *, fetch: bool, tag: str | None = None) ->
         local = root / path
         if not local.is_dir():
             raise SyncError(f"catalogue entry missing directory {path}")
+        if path.startswith("skills/"):
+            skill_text = (local / "SKILL.md").read_text(encoding="utf-8")
+            if not re.search(r"(?m)^name:\s*['\"]?" + re.escape(item["id"]) + r"['\"]?\s*$", skill_text):
+                raise SyncError(f"{path}/SKILL.md: frontmatter name mismatch")
         if item["ownership"] == "custom":
-            if path.startswith("skills/") and item.get("upstream_path") and not item.get("diverged_from"):
-                raise SyncError(f"{path}: missing diverged_from provenance")
+            if file_tree(root, old, path) and (not item.get("upstream_path") or not item.get("diverged_from")):
+                raise SyncError(f"{path}: diverged fork content requires upstream_path and diverged_from")
             continue
         upstream = file_tree(root, old, path)
         local_files = {
@@ -152,10 +178,6 @@ def validate(root: Path, remote: str, *, fetch: bool, tag: str | None = None) ->
         for name in upstream:
             if local_files[name].is_symlink() or local_files[name].read_bytes() != blob(root, old, name):
                 raise SyncError(f"{name} differs from recorded upstream; protect it as custom")
-        if path.startswith("skills/"):
-            skill_text = (local / "SKILL.md").read_text(encoding="utf-8")
-            if not re.search(r"(?m)^name:\s*['\"]?" + re.escape(item["id"]) + r"['\"]?\s*$", skill_text):
-                raise SyncError(f"{path}/SKILL.md: frontmatter name mismatch")
     if tag:
         if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?", tag):
             raise SyncError(f"not a release tag: {tag}")
