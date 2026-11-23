@@ -1,0 +1,86 @@
+name: Propose reviewed upstream skill sync
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      upstream_sha:
+        description: "Optional full 40-hex upstream commit (default: upstream main)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-skills-sync
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Synchronize reviewed-upstream candidates
+        env:
+          UPSTREAM_SHA: ${{ inputs.upstream_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$UPSTREAM_SHA" ]]; then
+            python scripts/upstream_skills.py sync --sha "$UPSTREAM_SHA"
+          else
+            python scripts/upstream_skills.py sync
+          fi
+
+      - name: Validate resulting catalogue and skills
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s scripts -p 'upstream_skills_test.py'
+          python scripts/upstream_skills.py validate --fetch
+          node scripts/validate-skills.js
+          node scripts/validate-reference-links.js
+          node scripts/validate-skill-distribution-fixtures.js
+
+      - name: Open a review-only pull request (never merge)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "Already up to date; no PR necessary."
+            exit 0
+          fi
+
+          sha="$(tr -d '\n' < docs/upstream-revision.txt)"
+          short="$(printf '%.12s' "$sha")"
+          branch="automation/upstream-skills-$short"
+          if git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null 2>&1; then
+            echo "::notice::Branch $branch already exists; review its open PR instead of overwriting it."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A -- skills/ references/ agents/ catalogue.toml docs/upstream-revision.txt
+          git diff --cached --check
+          git commit -m "chore: propose upstream skills sync at $short"
+          git push origin "HEAD:refs/heads/$branch"
+          gh pr create \
+            --base main --head "$branch" \
+            --title "chore: sync upstream skills to $short" \
+            --body "$(printf 'Refs #1\n\n## Summary\nReview upstream skill updates from addyosmani/agent-skills at %s. Only catalogue-declared upstream-owned files are modified. No auto-merge.\n\n## Verification\n- Upstream source pin verified against full SHA.\n- Upstream sync unit tests and repository validators passed before creating this PR.\n- Review the changed skills, provenance, and release implications before merging.\n' "$sha")"
+          gh pr edit "$branch" --add-label feature
